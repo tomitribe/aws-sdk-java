@@ -41,10 +41,8 @@ public class AWS4Signer extends AbstractAWSSigner
 
     protected static final String ALGORITHM = "AWS4-HMAC-SHA256";
     protected static final String TERMINATOR = "aws4_request";
-    private static final DateTimeFormatter dateFormatter = DateTimeFormat
-            .forPattern("yyyyMMdd").withZoneUTC();
-    private static final DateTimeFormatter timeFormatter = DateTimeFormat
-            .forPattern("yyyyMMdd'T'HHmmss'Z'").withZoneUTC();
+    private static final DateTimeFormatter dateFormatter = DateTimeFormat.forPattern("yyyyMMdd").withZoneUTC();
+    private static final DateTimeFormatter timeFormatter = DateTimeFormat.forPattern("yyyyMMdd'T'HHmmss'Z'").withZoneUTC();
 
     /** Seconds in a week, which is the max expiration time Sig-v4 accepts */
     private final static long MAX_EXPIRATION_TIME_IN_SECONDS = 60 * 60 * 24 * 7;
@@ -100,20 +98,17 @@ public class AWS4Signer extends AbstractAWSSigner
             return;
         }
 
-        AWSCredentials sanitizedCredentials = sanitizeCredentials(credentials);
+        final AWSCredentials sanitizedCredentials = sanitizeCredentials(credentials);
         if ( sanitizedCredentials instanceof AWSSessionCredentials ) {
             addSessionCredentials(request, (AWSSessionCredentials) sanitizedCredentials);
         }
 
         addHostHeader(request);
 
-        long dateMilli = getDateFromRequest(request);
+        final String contentSha256 = calculateContentHash(request);
 
+        final long dateMilli = getDateFromRequest(request);
         final String dateStamp = getDateStamp(dateMilli);
-        String scope =  getScope(request, dateStamp);
-
-        String contentSha256 = calculateContentHash(request);
-
         final String timeStamp = getTimeStamp(dateMilli);
         request.addHeader("X-Amz-Date", timeStamp);
 
@@ -121,9 +116,7 @@ public class AWS4Signer extends AbstractAWSSigner
             request.addHeader("x-amz-content-sha256", contentSha256);
         }
 
-        String signingCredentials = sanitizedCredentials.getAWSAccessKeyId() + "/" + scope;
-
-        HeaderSigningResult headerSigningResult = computeSignature(
+        final HeaderSigningResult headerSigningResult = computeSignature(
             request,
             dateStamp,
             timeStamp,
@@ -131,19 +124,14 @@ public class AWS4Signer extends AbstractAWSSigner
             contentSha256,
             sanitizedCredentials);
 
-        String credentialsAuthorizationHeader =
-                "Credential=" + signingCredentials;
-        String signedHeadersAuthorizationHeader =
-                "SignedHeaders=" + getSignedHeadersString(request);
-        String signatureAuthorizationHeader =
-                "Signature=" + BinaryUtils.toHex(headerSigningResult.getSignature());
+        {
+            final String authorizationHeader = ALGORITHM + " "
+                    + "Credential=" + sanitizedCredentials.getAWSAccessKeyId() + "/" + getScope(request, dateStamp) + ", "
+                    + "SignedHeaders=" + getSignedHeadersString(request) + ", "
+                    + "Signature=" + BinaryUtils.toHex(headerSigningResult.getSignature());
 
-        String authorizationHeader = ALGORITHM + " "
-                + credentialsAuthorizationHeader + ", "
-                + signedHeadersAuthorizationHeader + ", "
-                + signatureAuthorizationHeader;
-
-        request.addHeader("Authorization", authorizationHeader);
+            request.addHeader("Authorization", authorizationHeader);
+        }
 
         processRequestPayload(request, headerSigningResult);
     }
