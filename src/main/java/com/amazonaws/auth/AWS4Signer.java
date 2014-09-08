@@ -215,12 +215,15 @@ public class AWS4Signer extends AbstractAWSSigner
         return buffer.toString();
     }
 
+    /**
+     * Creates a sorted list of lower-case header names joined by ";"
+     */
     protected String getSignedHeadersString(Request<?> request) {
-        List<String> sortedHeaders = new ArrayList<String>();
+        final List<String> sortedHeaders = new ArrayList<String>();
         sortedHeaders.addAll(request.getHeaders().keySet());
         Collections.sort(sortedHeaders, String.CASE_INSENSITIVE_ORDER);
 
-        StringBuilder buffer = new StringBuilder();
+        final StringBuilder buffer = new StringBuilder();
         for (String header : sortedHeaders) {
             if (buffer.length() > 0) buffer.append(";");
             buffer.append(header.toLowerCase());
