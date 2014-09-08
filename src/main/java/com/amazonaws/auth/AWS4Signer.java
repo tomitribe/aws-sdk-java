@@ -91,6 +91,24 @@ public class AWS4Signer extends AbstractAWSSigner
 
     protected static final Log log = LogFactory.getLog(AWS4Signer.class);
 
+    /**
+     * Sets an 'Authorization' header with the following string content
+     *
+     *  AWS4-HMAC-SHA256 \
+     *  Credential=<aws-access-key-id>/<date-stamp>/<region-name>/<service-name>/aws4_request ,\
+     *  SignedHeaders=<header-name-a>;<header-name-b>;<header-name-c>;<header-name-d> ,\
+     *  Signature=<hex>
+     *
+     * The 'host' header is required to be in the SignedHeaders list.  Host will be set if not already present.
+     *
+     * Sets an 'X-Amz-Date' header with the following content
+     *
+     *  TODO
+     *
+     * Sets an 'x-amz-content-sha256' header with the following content
+     *
+     *  TODO
+     */
     @Override
     public void sign(Request<?> request, AWSCredentials credentials) {
         // annonymous credentials, don't sign
@@ -125,9 +143,17 @@ public class AWS4Signer extends AbstractAWSSigner
             sanitizedCredentials);
 
         {
-            final String authorizationHeader = ALGORITHM + " "
+            final String authorizationHeader =
+                    // 'AWS4-HMAC-SHA256 '
+                    ALGORITHM + " "
+
+                    // 'Credential=<aws-access-key-id>/<date-stamp>/<region-name>/<service-name>/aws4_request ,'
                     + "Credential=" + sanitizedCredentials.getAWSAccessKeyId() + "/" + getScope(request, dateStamp) + ", "
+
+                    // 'SignedHeaders=<header-name-a>;<header-name-b>;<header-name-c>;<header-name-d> ,'
                     + "SignedHeaders=" + getSignedHeadersString(request) + ", "
+
+                    // 'Signature=<hex>'
                     + "Signature=" + BinaryUtils.toHex(headerSigningResult.getSignature());
 
             request.addHeader("Authorization", authorizationHeader);
@@ -311,11 +337,13 @@ public class AWS4Signer extends AbstractAWSSigner
         request.addHeader("Host", hostHeader);
     }
 
+    /**
+     * Returns the datestamp, region name, service name and 'aws4_request' joined by '/'
+     */
     protected String getScope(Request<?> request, String dateStamp) {
-        String regionName = extractRegionName(request.getEndpoint());
-        String serviceName = extractServiceName(request.getEndpoint());
-        String scope =  dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
-        return scope;
+        final String regionName = extractRegionName(request.getEndpoint());
+        final String serviceName = extractServiceName(request.getEndpoint());
+        return dateStamp + "/" + regionName + "/" + serviceName + "/" + TERMINATOR;
     }
 
     /**
